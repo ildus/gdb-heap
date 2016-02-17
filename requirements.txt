@@ -1,0 +1,5 @@
+# System requirements
+# libc6-dev libc6-dbg python-gi libglib2.0-dev
+
+# Python requirements
+pyl
