@@ -114,8 +114,7 @@ class HeapSizes(gdb.Command):
         except KeyboardInterrupt:
             pass # FIXME
         t = Table(['Chunk size', 'Num chunks', 'Allocated size'])
-        for size in sorted(chunks_by_size.keys(),
-                           lambda s1, s2: chunks_by_size[s2] * s2 - chunks_by_size[s1] * s1):
+        for size in sorted(chunks_by_size.keys(), key=lambda x: chunks_by_size[x] * x):
             t.add_row([fmt_size(size),
                        chunks_by_size[size],
                        fmt_size(chunks_by_size[size] * size)])

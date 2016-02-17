@@ -126,7 +126,8 @@ class MChunkPtr(WrappedPointer):
     def next_chunk(self):
         # Analog of:
         #   #define next_chunk(p) ((mchunkptr)( ((char*)(p)) + ((p)->size & ~SIZE_BITS) ))
-        ptr = self._gdbval.cast(type_char_ptr)
+        # Dirty fix for 64 bits
+        ptr = self._gdbval.cast(gdb.lookup_type('char').pointer())
         cs = self.chunksize()
         ptr += cs
         ptr = ptr.cast(MChunkPtr.gdb_type())
@@ -136,7 +137,8 @@ class MChunkPtr(WrappedPointer):
     def prev_chunk(self):
         # Analog of:
         #   #define prev_chunk(p) ((mchunkptr)( ((char*)(p)) - ((p)->prev_size) ))
-        ptr = self._gdbval.cast(type_char_ptr)
+        # Dirty fix for 64 bits
+        ptr = self._gdbval.cast(gdb.lookup_type('char').pointer())
         ptr -= self.field('prev_size')
         ptr = ptr.cast(MChunkPtr.gdb_type())
         return MChunkPtr(ptr)
@@ -174,7 +176,8 @@ class MallocState(WrappedValue):
         #print '001', ptr
         ptr = ptr.address
         #print '002', ptr
-        ptr = ptr.cast(type_char_ptr)
+        # Dirty fix for 64 bits
+        ptr = ptr.cast(gdb.lookup_type('char').pointer())
         #print '003', ptr
         ptr -= offsetof('struct malloc_chunk', 'fd')
         #print '004', ptr

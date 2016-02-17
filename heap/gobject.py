@@ -25,7 +25,13 @@ from heap import WrappedPointer, WrappedValue, caching_lookup_type, type_char_pt
 dir_ = '/usr/share/glib-2.0/gdb'
 if not dir_ in sys.path:
     sys.path.insert(0, dir_)
-from glib import read_global_var, g_quark_to_string
+try:
+    from glib import read_global_var, g_quark_to_string
+# # Dirty fix for python3
+except ImportError:
+    from gi.repository import GLib
+    read_global_var = lambda x: None
+    g_quark_to_string = GLib.quark_to_string
 
 
 # This was adapted from glib's gobject.py:g_type_to_name

@@ -75,7 +75,7 @@ def array_length(_gdbval):
     the array'''
     arr_size = _gdbval.type.sizeof
     elem_size = _gdbval[0].type.sizeof
-    return arr_size/elem_size
+    return arr_size // elem_size
 
 def offsetof(typename, fieldname):
     '''Get the offset (in bytes) from the start of the given type to the given
@@ -151,7 +151,8 @@ class WrappedValue(object):
 
 class WrappedPointer(WrappedValue):
     def as_address(self):
-        return int(self._gdbval.cast(type_void_ptr))
+        # Dirty fix for 64 bits
+        return int(self._gdbval.cast(gdb.lookup_type('void').pointer()))
 
     def __str__(self):
         return ('<%s for inferior 0x%x>'

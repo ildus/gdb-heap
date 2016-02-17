@@ -90,8 +90,7 @@ class Diff(object):
         if len(set_of_usage) == 0:
             result += '  (none)\n'
             return result
-        for usage in sorted(set_of_usage,
-                            lambda u1, u2: cmp(u1.start, u2.start)):
+        for usage in sorted(set_of_usage, key=lambda x: x.start):
             result += ('  %s -> %s %8i bytes %20s |%s\n'
                        % (fmt_addr(usage.start),
                           fmt_addr(usage.start + usage.size-1),
