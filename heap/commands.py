@@ -360,10 +360,38 @@ class HeapArenaSelect(gdb.Command):
     @target_running
     def invoke(self, args, from_tty):
         from heap.glibc import glibc_arenas
+
         arena_num = int(args)
         glibc_arenas.cur_arena = glibc_arenas.arenas[arena_num]
         print("Arena set to %s" % glibc_arenas.cur_arena.address)
 
+
+class HeapVisualize(gdb.Command):
+    'Visualize heap'
+    def __init__(self):
+        gdb.Command.__init__(self,
+                             "heap vis",
+                             gdb.COMMAND_DATA)
+
+    @need_debuginfo
+    def invoke(self, args, from_tty):
+        from heap.visualize import draw_chunk_usage
+
+        malloc_state = glibc_arenas.get_ms()
+        if len(args) == 2:
+            # Will raise ValueError on conversion error
+            heap_start = int(args[0])
+            heap_end = int(args[1])
+            if heap_start >= heap_end:
+                raise ValueError("Range start must be inferior to end")
+        else:
+            malloc_par = MallocPar.get()
+            # Lower heap boundary
+            heap_start = int(malloc_par.field("sbrk_base"))
+            # Upper heap boundary
+            heap_end = int(malloc_state.field("top"))
+
+        draw_chunk_usage(malloc_state.iter_chunks(), (heap_start, heap_end), (1024, 512))
 
 
 def register_commands():
@@ -380,6 +408,7 @@ def register_commands():
     HeapArenas()
     HeapArenaSelect()
     Hexdump()
+    HeapVisualize()
 
     from heap.cpython import register_commands as register_cpython_commands
     register_cpython_commands()
