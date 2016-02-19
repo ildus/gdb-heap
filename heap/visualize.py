@@ -52,7 +52,7 @@ def draw_chunk_usage(chunks, range_, size=(1024, 128)):
         chunk_id = canvas.find_withtag("current")[0]
         chunk = chunk_map[chunk_id]
         text = os.linesep.join([textwrap.fill(str(chunk), line_length),
-                                hexdump_as_bytes(chunk.as_mem(), line_length)[:-1]])
+                                hexdump_as_bytes(chunk.as_mem(), line_length // 2, chars_only=False)])
         tool_tip.show(text)
 
     def on_leave(event):
