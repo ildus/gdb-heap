@@ -18,7 +18,6 @@ import gdb
 import re
 import sys
 
-from heap.glibc import glibc_arenas
 from heap.history import history, Snapshot, Diff
 
 from heap import lazily_get_usage_list, \
@@ -27,6 +26,7 @@ from heap import lazily_get_usage_list, \
     hexdump_as_bytes, \
     Table, \
     MissingDebuginfo
+
 
 def need_debuginfo(f):
     def g(self, args, from_tty):
@@ -38,6 +38,19 @@ def need_debuginfo(f):
             print('    debuginfo-install %s' % e.module)
     return g
 
+
+def target_running(f):
+    def g(self, args, from_tty):
+        try:
+            return f(self, args, from_tty)
+        except (gdb.error, NameError) as e:
+            print("Gdb error: \"%s\". Is the target running?" % e)
+            import traceback
+            print()
+            print(traceback.format_exc())
+    return g
+
+
 class Heap(gdb.Command):
     'Print a report on memory usage, by category'
     def __init__(self):
@@ -47,6 +60,7 @@ class Heap(gdb.Command):
                               prefix=True)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         total_by_category = {}
         count_by_category = {}
@@ -94,7 +108,9 @@ class HeapSizes(gdb.Command):
         gdb.Command.__init__ (self,
                               "heap sizes",
                               gdb.COMMAND_DATA)
+
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         ms = glibc_arenas.get_ms()
         chunks_by_size = {}
@@ -131,6 +147,7 @@ class HeapUsed(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         print('Used chunks of memory on heap')
         print('-----------------------------')
@@ -158,6 +175,7 @@ class HeapFree(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         print('Free chunks of memory on heap')
         print('-----------------------------')
@@ -189,6 +207,7 @@ class HeapAll(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         print('All chunks of memory on heap (both used and free)')
         print('-------------------------------------------------')
@@ -215,6 +234,7 @@ class HeapLog(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         h = history
         if len(h.snapshots) == 0:
@@ -239,6 +259,7 @@ class HeapLabel(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         s = history.add(args)
         print(s.summary())
@@ -252,6 +273,7 @@ class HeapDiff(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         h = history
         if len(h.snapshots) == 0:
@@ -273,6 +295,7 @@ class HeapSelect(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
         from heap.query import do_query
         from heap.parser import ParserError
@@ -320,7 +343,9 @@ class HeapArenas(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
+        from heap.glibc import glibc_arenas
         for n, arena in enumerate(glibc_arenas.arenas):
             print("Arena #%d: %s" % (n, arena.address))
 
@@ -332,9 +357,10 @@ class HeapArenaSelect(gdb.Command):
                               gdb.COMMAND_DATA)
 
     @need_debuginfo
+    @target_running
     def invoke(self, args, from_tty):
+        from heap.glibc import glibc_arenas
         arena_num = int(args)
-
         glibc_arenas.cur_arena = glibc_arenas.arenas[arena_num]
         print("Arena set to %s" % glibc_arenas.cur_arena.address)
 
