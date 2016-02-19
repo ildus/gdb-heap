@@ -112,6 +112,7 @@ class HeapSizes(gdb.Command):
     @need_debuginfo
     @target_running
     def invoke(self, args, from_tty):
+        from heap.glibc import glibc_arenas
         ms = glibc_arenas.get_ms()
         chunks_by_size = {}
         num_chunks = 0
@@ -149,6 +150,7 @@ class HeapUsed(gdb.Command):
     @need_debuginfo
     @target_running
     def invoke(self, args, from_tty):
+        from heap.glibc import glibc_arenas
         print('Used chunks of memory on heap')
         print('-----------------------------')
         ms = glibc_arenas.get_ms()
@@ -177,6 +179,7 @@ class HeapFree(gdb.Command):
     @need_debuginfo
     @target_running
     def invoke(self, args, from_tty):
+        from heap.glibc import glibc_arenas
         print('Free chunks of memory on heap')
         print('-----------------------------')
         ms = glibc_arenas.get_ms()
@@ -209,6 +212,7 @@ class HeapAll(gdb.Command):
     @need_debuginfo
     @target_running
     def invoke(self, args, from_tty):
+        from heap.glibc import glibc_arenas
         print('All chunks of memory on heap (both used and free)')
         print('-------------------------------------------------')
         ms = glibc_arenas.get_ms()
