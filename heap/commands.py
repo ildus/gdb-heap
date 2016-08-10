@@ -17,6 +17,7 @@
 import gdb
 import re
 import sys
+import argparse
 
 from heap.history import history, Snapshot, Diff
 
@@ -154,20 +155,24 @@ class HeapUsed(gdb.Command):
         print('Used chunks of memory on heap')
         print('-----------------------------')
         ms = glibc_arenas.get_ms()
-        for i, chunk in enumerate(ms.iter_chunks()):
-            if not chunk.is_inuse():
-                continue
-            size = chunk.chunksize()
-            mem = chunk.as_mem()
-            u = Usage(mem, size)
-            category = categorize(u, None)
-            hd = hexdump_as_bytes(mem, 32)
-            print ('%6i: %s -> %s %8i bytes %20s |%s'
-                   % (i,
-                      fmt_addr(chunk.as_mem()),
-                      fmt_addr(chunk.as_mem()+size-1),
-                      size, category, hd))
+        try:
+            for i, chunk in enumerate(ms.iter_chunks()):
+                if not chunk.is_inuse():
+                    continue
+                size = chunk.chunksize()
+                mem = chunk.as_mem()
+                u = Usage(mem, size)
+                category = categorize(u, None)
+                hd = hexdump_as_bytes(mem, 32)
+                print ('%6i: %s -> %s %8i bytes %20s |%s'
+                       % (i,
+                          fmt_addr(chunk.as_mem()),
+                          fmt_addr(chunk.as_mem()+size-1),
+                          size, category, hd))
+        except KeyboardInterrupt:
+            print("Interrupted")
         print()
+
 
 class HeapFree(gdb.Command):
     'Print free heap chunks'
@@ -308,6 +313,20 @@ class HeapSelect(gdb.Command):
         except ParserError as e:
             print(e)
 
+class HeapChunk(gdb.Command):
+    'Print lol'
+    def __init__(self):
+        gdb.Command.__init__ (self,
+                              "heap chunk",
+                              gdb.COMMAND_DATA)
+
+    @need_debuginfo
+    @target_running
+    def invoke(self, args, from_tty):
+        print(args)
+        arg_list = gdb.string_to_argv(args)
+        print(arg_list)
+        
 class Hexdump(gdb.Command):
     'Print a hexdump, starting at the specific region of memory'
     def __init__(self):
@@ -316,28 +335,59 @@ class Hexdump(gdb.Command):
                               gdb.COMMAND_DATA)
 
     def invoke(self, args, from_tty):
-        print(repr(args))
+        
         arg_list = gdb.string_to_argv(args)
+        parser = argparse.ArgumentParser(add_help=True, usage="hexdump [-c] [-w] [-s SIZE] <ADDR>")
+        parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
+        parser.add_argument('-c', dest='chars', action="store_true", default=False, help="Show chars only")
+        parser.add_argument('-s', dest='size', default=None, help='Total Dump size')
+        parser.add_argument('-w', dest='wide', action="store_true", default=False, 
+            help='wide: 32 bytes per line instead of 16')
 
-        chars_only = True
+        try:
+            args_dict = parser.parse_args(args=arg_list)
+        except:
+            return
 
-        if len(arg_list) == 2:
-            addr_arg = arg_list[0]
-            chars_only = True if args[1] == '-c' else False
+        addr_arg = args_dict.addr[0]
+        if args_dict.size:
+            if args_dict.size.startswith('0x'):
+                total_size = int(args_dict.size, 16)
+            else:
+                total_size = int(args_dict.size)
         else:
-            addr_arg = args
+            total_size = 0x100
+
+        if args_dict.wide:
+            size = 32
+        else:
+            size = 16
+
+        chars_only = args_dict.chars
+
 
         if addr_arg.startswith('0x'):
-            addr = int(addr_arg, 16)
+            start = int(addr_arg, 16)
         else:
-            addr = int(addr_arg)
+            start = int(addr_arg)
 
-        # assume that paging will cut in and the user will quit at some point:
-        size = 32
-        while True:
-            hd = hexdump_as_bytes(addr, size, chars_only=chars_only)
-            print ('%s -> %s %s' % (fmt_addr(addr), fmt_addr(addr + size -1), hd))
-            addr += size
+        addr = start
+        end = addr + total_size
+        try:
+            while addr + size <= end:
+                hd = hexdump_as_bytes(addr, size, chars_only=chars_only)
+                print ('%s -> %s %s' % (fmt_addr(addr), fmt_addr(addr + size -1), hd))
+                addr += size
+            
+            r = (end-start) % size
+            if r > 0 :
+                hd = hexdump_as_bytes(addr, r, chars_only=chars_only)
+                print ('%s -> %s %s' % (fmt_addr(addr), fmt_addr(addr + r -1), hd))
+        except KeyboardInterrupt:
+            print("Interrupt")
+            return
+        except gdb.MemoryError:
+            print("Error accessing memory")
 
 class HeapArenas(gdb.Command):
     'Display heap arenas available'
@@ -383,6 +433,7 @@ def register_commands():
     HeapSelect()
     HeapArenas()
     HeapArenaSelect()
+    HeapChunk()
     Hexdump()
 
     from heap.cpython import register_commands as register_cpython_commands
