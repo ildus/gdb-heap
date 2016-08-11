@@ -233,6 +233,7 @@ class Usage(object):
             assert isinstance(category, Category)
         self.start = start
         self.size = size
+        self.end = self.start + size
         self.category = category
         self.level = level
         self.hd = hd

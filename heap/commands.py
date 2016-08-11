@@ -313,6 +313,32 @@ class HeapSelect(gdb.Command):
         except ParserError as e:
             print(e)
 
+class HeapSearch(gdb.Command):
+    'Search for address in heap'
+    def __init__(self):
+        gdb.Command.__init__ (self,
+                              "heap search",
+                              gdb.COMMAND_DATA)
+
+    @need_debuginfo
+    @target_running
+    def invoke(self, args, from_tty):
+        arg_list = gdb.string_to_argv(args)
+        if len(arg_list) == 0:
+            print("heap search <ADDR>")
+            return
+
+        try:
+            if arg_list[0].startswith("0x"):
+                addr = int(arg_list[0], 16)
+            else:
+                addr = int(arg_list[0])
+        except:
+            print("heap search <ADDR>")
+            raise
+
+        gdb.execute("heap select start <= %s AND end >= %s" % (hex(addr), hex(addr) ))
+
 class HeapChunk(gdb.Command):
     'Print lol'
     def __init__(self):
@@ -433,6 +459,7 @@ def register_commands():
     HeapSelect()
     HeapArenas()
     HeapArenaSelect()
+    HeapSearch()
     HeapChunk()
     Hexdump()
 
