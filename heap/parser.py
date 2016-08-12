@@ -136,7 +136,7 @@ def p_expression_group(t):
 def p_expression_name(t):
     'expression : ID'
     attrname = t[1]
-    attrnames = ('domain', 'kind', 'detail', 'addr', 'start', 'size', 'end')
+    attrnames = ('domain', 'kind', 'detail', 'userptr', 'start', 'size', 'end')
     if attrname not in attrnames:
         raise ParserError.from_production(t, attrname,
                                           ('Unknown attribute "%s" (supported are %s)'

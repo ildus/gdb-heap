@@ -231,7 +231,9 @@ class Usage(object):
         assert isinstance(size, int)
         if category:
             assert isinstance(category, Category)
+        SIZE_SZ = caching_lookup_type('size_t').sizeof
         self.start = start
+        self.userptr = self.start + (2 * SIZE_SZ)
         self.size = size
         self.end = self.start + size
         self.category = category
@@ -676,6 +678,7 @@ def iter_usage():
 
     for chunk in ms.iter_sbrk_chunks():
         mem_ptr = chunk.as_mem()
+        chunk_ptr = chunk.as_address()
         chunksize = chunk.chunksize()
 
         if chunk.is_inuse():
@@ -684,7 +687,7 @@ def iter_usage():
                 for u in arena.iter_usage():
                     yield u
             else:
-                yield Usage(int(mem_ptr), chunksize)
+                yield Usage(int(chunk_ptr), chunksize)
 
 
 
