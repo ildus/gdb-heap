@@ -323,6 +323,8 @@ class HeapSearch(gdb.Command):
     @need_debuginfo
     @target_running
     def invoke(self, args, from_tty):
+        from heap.glibc import glibc_arenas
+
         arg_list = gdb.string_to_argv(args)
         if len(arg_list) == 0:
             print("heap search <ADDR>")
@@ -336,8 +338,25 @@ class HeapSearch(gdb.Command):
         except:
             print("heap search <ADDR>")
             raise
+        
+        print('search heap for address %s' % hex(addr))
+        print('-------------------------------------------------')
+        ms = glibc_arenas.get_ms()
+        for i, chunk in enumerate(ms.iter_chunks()):
+            
+            size = chunk.chunksize()
+            if addr >= chunk.as_address() and addr <= chunk.as_address() + size:
+                if chunk.is_inuse():
+                    kind = ' inuse'
+                else:
+                    kind = ' free'
 
-        gdb.execute("heap select start <= %s AND end >= %s" % (hex(addr), hex(addr) ))
+                print ('%i: %s -> %s %s: %i bytes (%s)'
+                       % (i,
+                          fmt_addr(chunk.as_address()),
+                          fmt_addr(chunk.as_address()+size-1),
+                          kind, size, chunk))
+        print()
 
 class HeapChunk(gdb.Command):
     'Print lol'
