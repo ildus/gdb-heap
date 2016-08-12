@@ -326,37 +326,48 @@ class HeapSearch(gdb.Command):
         from heap.glibc import glibc_arenas
 
         arg_list = gdb.string_to_argv(args)
-        if len(arg_list) == 0:
-            print("heap search <ADDR>")
-            return
+
+        parser = argparse.ArgumentParser(add_help=True, usage="heap search [-a] [-b] <ADDR>")
+        parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
+        parser.add_argument('-b', dest='before', action="store_true", default=False, help="Show chunk before")
+        parser.add_argument('-a', dest='after', action="store_true", default=False, help="Show chunk after")
 
         try:
-            if arg_list[0].startswith("0x"):
-                addr = int(arg_list[0], 16)
-            else:
-                addr = int(arg_list[0])
+            args_dict = parser.parse_args(args=arg_list)
         except:
-            print("heap search <ADDR>")
-            raise
+            return
+
+        addr_arg = args_dict.addr[0]
+
+        if addr_arg.startswith("0x"):
+            addr = int(addr_arg, 16)
+        else:
+            addr = int(addr_arg)
         
         print('search heap for address %s' % hex(addr))
         print('-------------------------------------------------')
         ms = glibc_arenas.get_ms()
+        output_str = ""
         for i, chunk in enumerate(ms.iter_chunks()):
             
             size = chunk.chunksize()
-            if addr >= chunk.as_address() and addr <= chunk.as_address() + size:
+            if addr >= chunk.as_address() and addr < chunk.as_address() + size:
                 if chunk.is_inuse():
                     kind = ' inuse'
                 else:
                     kind = ' free'
 
-                print ('%i: %s -> %s %s: %i bytes (%s)'
-                       % (i,
+                output_str += 'BLOCK:\t%s -> %s %s: \n\t%i bytes (%s)\n' % (
                           fmt_addr(chunk.as_address()),
                           fmt_addr(chunk.as_address()+size-1),
-                          kind, size, chunk))
-        print()
+                          kind, size, chunk)
+                if args_dict.after:
+                    chunk_after = chunk.next_chunk()
+                    output_str += 'NEXT:\t%s -> %s %s: \n\t%i bytes (%s)\n' % (
+                        fmt_addr(chunk_after.as_address()),
+                        fmt_addr(chunk_after.as_address()+size-1),
+                        kind, size, chunk_after)
+        print(output_str)
 
 class HeapChunk(gdb.Command):
     'Print lol'
