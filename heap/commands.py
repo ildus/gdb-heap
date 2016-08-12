@@ -363,10 +363,14 @@ class HeapSearch(gdb.Command):
                           kind, size, chunk)
                 if args_dict.after:
                     chunk_after = chunk.next_chunk()
+                    if chunk.is_inuse():
+                        kind = ' inuse'
+                    else:
+                        kind = ' free'
                     output_str += 'NEXT:\t%s -> %s %s: \n\t%i bytes (%s)\n' % (
                         fmt_addr(chunk_after.as_address()),
                         fmt_addr(chunk_after.as_address()+size-1),
-                        kind, size, chunk_after)
+                        kind, chunk_after.chunksize(), chunk_after)
         print(output_str)
 
 class HeapChunk(gdb.Command):
