@@ -145,6 +145,9 @@ class WrappedValue(object):
 
 #    def address(self):
 #        return int(self._gdbval.cast(type_void_ptr))
+    
+    def cast(self, type_):
+        return WrappedValue(self._gdbval.cast(type_))
 
     def is_null(self):
         return int(self._gdbval) == 0

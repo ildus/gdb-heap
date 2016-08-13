@@ -400,6 +400,10 @@ class Objdump(gdb.Command):
     def invoke(self, args, from_tty):
         from heap.glibc import iter_code_sections
         from heap import WrappedPointer,caching_lookup_type
+        SIZE_SZ = caching_lookup_type('size_t').sizeof
+        type_size_t = gdb.lookup_type('size_t')
+        type_size_t_ptr = type_size_t.pointer()
+
         arg_list = gdb.string_to_argv(args)
         parser = argparse.ArgumentParser(add_help=True, usage="objdump [-s SIZE] <ADDR>")
         parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
@@ -422,9 +426,9 @@ class Objdump(gdb.Command):
             else:
                 total_size = int(args_dict.size)
         else:
-            total_size = 0x10
+            total_size = 10 * SIZE_SZ
 
-        print('Searching in the following executable sections'
+        print('Searching in the following executable sections')
         print('-------------------------------------------------')
         text = [] #list of pairs (start, end) of a code section
         for i in gdb.inferiors():
@@ -434,20 +438,26 @@ class Objdump(gdb.Command):
 
         print('\nDumping Object at address %s' % hex(addr))
         print('-------------------------------------------------')
-        SIZE_SZ = caching_lookup_type('size_t').sizeof
+        
         for a in range(addr,addr+total_size, SIZE_SZ):
-            ptr = WrappedPointer(gdb.Value(a))
+            ptr = WrappedPointer(gdb.Value(a).cast(type_size_t_ptr))
             #dereference first, at the first access denied bail out, dont go further
             try:
                 val = ptr.dereference()
-                print("%s => %s" % (hex(ptr), hex(val)))
+                found = False
+                val_int = int(str(val.cast(type_size_t)))
                 for t in text:
-                    if a >= t[0] and a <t[1]:
-                        place=0
-            
-            except:
-                print("Error accessing memory")
-                raise
+                    if val_int >= t[0] and val_int < t[1]:
+                        found = True
+                
+                if found:
+                    out_line = "%s => %s (%s)" % (hex(ptr.as_address()), hex(val_int), t[2] )
+                else:
+                    out_line = "%s => %s" % (hex(ptr.as_address()), hex(val_int) )
+                print(out_line)
+            except gdb.MemoryError:
+                print("Error accessing memory at %s" % hex(ptr.as_address()))
+                return
 
 
 class Hexdump(gdb.Command):
