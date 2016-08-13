@@ -380,12 +380,11 @@ def sbrk_base():
 #    }
 #
 
-
-def iter_mmap_heap_chunks(pid):
+def iter_mappings(pid):
     '''Try to locate the memory-mapped heap allocations for the given
     process (by PID) by reading /proc/PID/maps
 
-    Yield a sequence of (start, end) pairs'''
+    Yield a sequence of (start, end, perms, offset, dev, inode, pathname) tuples'''
     for line in open('/proc/%i/maps' % pid):
         # print line,
         # e.g.:
@@ -401,17 +400,33 @@ def iter_mmap_heap_chunks(pid):
             # print m.groups()
             start, end, perms, offset, dev, inode, pathname = m.groups()
             # PROT_READ, PROT_WRITE, MAP_PRIVATE:
-            if perms == 'rw-p':
-                if offset == '00000000': # FIXME bits?
-                    if dev == '00:00': # FIXME
-                        if inode == '0': # FIXME
-                            if pathname == '': # FIXME
-                                # print 'heap line?:', line
-                                # print m.groups()
-                                start, end = [int(m.group(i), 16) for i in (1, 2)]
-                                yield (start, end)
+            start, end = [int(m.group(i), 16) for i in (1, 2)]
+            yield (start, end, perms, offset, dev, inode, pathname)
         else:
             print('unmatched :', line)
+
+def iter_mmap_heap_chunks(pid):
+    '''Try to locate the memory-mapped heap allocations for the given
+    process (by PID) by reading /proc/PID/maps
+
+    Yield a sequence of (start, end) pairs'''
+    
+    for start, end, perms, offset, dev, inode, pathname in iter_mappings(pid):
+        if perms == 'rw-p':
+            if offset == '00000000': # FIXME bits?
+                if dev == '00:00': # FIXME
+                    if inode == '0': # FIXME
+                        if pathname == '': # FIXME
+                            # print 'heap line?:', line
+                            # print m.groups()
+                            yield (start, end)
+
+def iter_code_sections(pid):
+    for start, end, perms, offset, dev, inode, pathname in iter_mappings(pid):
+        #print( "-".join([str(i) for i in [start, end, perms, offset, dev, inode, pathname] ]))
+        if re.fullmatch("..x.",perms):
+            if dev != '00:00': # FIXME
+                yield (start,end, pathname)
 
 class GlibcArenas(object):
     def __init__(self):

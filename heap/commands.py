@@ -386,7 +386,70 @@ class HeapChunk(gdb.Command):
         print(args)
         arg_list = gdb.string_to_argv(args)
         print(arg_list)
+
+
+class Objdump(gdb.Command):
+    'Try to detect if ADDR is an object and dump it'
+    def __init__(self):
+        gdb.Command.__init__ (self,
+                              "objdump",
+                              gdb.COMMAND_DATA)
+
+    @need_debuginfo
+    @target_running
+    def invoke(self, args, from_tty):
+        from heap.glibc import iter_code_sections
+        from heap import WrappedPointer,caching_lookup_type
+        arg_list = gdb.string_to_argv(args)
+        parser = argparse.ArgumentParser(add_help=True, usage="objdump [-s SIZE] <ADDR>")
+        parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
+        parser.add_argument('-s', dest='size', default=None, help='Total dump size')
         
+        try:
+            args_dict = parser.parse_args(args=arg_list)
+        except:
+            return
+
+        addr_arg = args_dict.addr[0]
+        if addr_arg.startswith('0x'):
+            addr = int(addr_arg, 16)
+        else:
+            addr = int(addr_arg)
+
+        if args_dict.size:
+            if args_dict.size.startswith('0x'):
+                total_size = int(args_dict.size, 16)
+            else:
+                total_size = int(args_dict.size)
+        else:
+            total_size = 0x10
+
+        print('Searching in the following executable sections'
+        print('-------------------------------------------------')
+        text = [] #list of pairs (start, end) of a code section
+        for i in gdb.inferiors():
+            for r in iter_code_sections(i.pid):
+                print("%s - %s : %s" % (hex(r[0]), hex(r[1]), r[2]))
+                text.append((r[0], r[1], r[2]))
+
+        print('\nDumping Object at address %s' % hex(addr))
+        print('-------------------------------------------------')
+        SIZE_SZ = caching_lookup_type('size_t').sizeof
+        for a in range(addr,addr+total_size, SIZE_SZ):
+            ptr = WrappedPointer(gdb.Value(a))
+            #dereference first, at the first access denied bail out, dont go further
+            try:
+                val = ptr.dereference()
+                print("%s => %s" % (hex(ptr), hex(val)))
+                for t in text:
+                    if a >= t[0] and a <t[1]:
+                        place=0
+            
+            except:
+                print("Error accessing memory")
+                raise
+
+
 class Hexdump(gdb.Command):
     'Print a hexdump, starting at the specific region of memory'
     def __init__(self):
@@ -496,6 +559,7 @@ def register_commands():
     HeapSearch()
     HeapChunk()
     Hexdump()
+    Objdump()
 
     from heap.cpython import register_commands as register_cpython_commands
     register_cpython_commands()
