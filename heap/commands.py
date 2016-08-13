@@ -374,7 +374,7 @@ class HeapSearch(gdb.Command):
         print(output_str)
 
 class HeapChunk(gdb.Command):
-    'Print lol'
+    'Not implemented'
     def __init__(self):
         gdb.Command.__init__ (self,
                               "heap chunk",
