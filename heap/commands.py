@@ -398,7 +398,7 @@ class Objdump(gdb.Command):
     @need_debuginfo
     @target_running
     def invoke(self, args, from_tty):
-        from heap.glibc import iter_code_sections
+        from heap.glibc import iter_code_sections,lookup_symbol
         from heap import WrappedPointer,caching_lookup_type
         SIZE_SZ = caching_lookup_type('size_t').sizeof
         type_size_t = gdb.lookup_type('size_t')
@@ -408,6 +408,7 @@ class Objdump(gdb.Command):
         parser = argparse.ArgumentParser(add_help=True, usage="objdump [-s SIZE] <ADDR>")
         parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
         parser.add_argument('-s', dest='size', default=None, help='Total dump size')
+        parser.add_argument('-v', dest='verbose', action="store_true", default=False, help='Verbose')
         
         try:
             args_dict = parser.parse_args(args=arg_list)
@@ -428,12 +429,13 @@ class Objdump(gdb.Command):
         else:
             total_size = 10 * SIZE_SZ
 
-        print('Searching in the following executable sections')
-        print('-------------------------------------------------')
+        if args_dict.verbose:
+            print('Searching in the following object ranges')
+            print('-------------------------------------------------')
         text = [] #list of pairs (start, end) of a code section
         for i in gdb.inferiors():
             for r in iter_code_sections(i.pid):
-                print("%s - %s : %s" % (hex(r[0]), hex(r[1]), r[2]))
+                if args_dict.verbose: print("%s - %s : %s" % (hex(r[0]), hex(r[1]), r[2]))
                 text.append((r[0], r[1], r[2]))
 
         print('\nDumping Object at address %s' % hex(addr))
@@ -451,7 +453,11 @@ class Objdump(gdb.Command):
                         found = True
                 
                 if found:
-                    out_line = "%s => %s (%s)" % (hex(ptr.as_address()), hex(val_int), t[2] )
+                    sym = lookup_symbol(val_int)
+                    if sym:
+                        out_line = "%s => %s (%s in %s)" % (hex(ptr.as_address()), hex(val_int), sym, t[2] )
+                    else:
+                        out_line = "%s => %s (%s)" % (hex(ptr.as_address()), hex(val_int), t[2] )
                 else:
                     out_line = "%s => %s" % (hex(ptr.as_address()), hex(val_int) )
                 print(out_line)

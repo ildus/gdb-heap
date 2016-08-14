@@ -421,12 +421,33 @@ def iter_mmap_heap_chunks(pid):
                             # print m.groups()
                             yield (start, end)
 
+#returns (start, end, pathname) of object if executable or writable (dynamic sections)
 def iter_code_sections(pid):
     for start, end, perms, offset, dev, inode, pathname in iter_mappings(pid):
         #print( "-".join([str(i) for i in [start, end, perms, offset, dev, inode, pathname] ]))
-        if re.fullmatch("..x.",perms):
+        if re.fullmatch("..x.", perms) or re.fullmatch(".w..", perms):
             if dev != '00:00': # FIXME
                 yield (start,end, pathname)
+
+def run_command(cmd):
+    return gdb.execute(cmd, to_string=True)
+
+def lookup_symbol(addr):
+    #https://sourceware.org/gdb/onlinedocs/gdb/Blocks-In-Python.html#Blocks-In-Python
+    #oddly this doesnt seem to work on my gdb 7.7-0ubuntu3.1
+    #return gdb.block_for_pc(addr).function
+    
+    '''
+    example:
+    (gdb) info symbol 0x7ffff7dd3828
+    main_arena + 200 in section .data of /lib/x86_64-linux-gnu/libc.so.6
+    '''
+    output = run_command("info symbol %s" % hex(addr))
+    if output.find("No symbol matches") >= 0:
+        return None
+    return re.findall("(.*) in section.*", output)[0]
+
+
 
 class GlibcArenas(object):
     def __init__(self):
