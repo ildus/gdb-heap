@@ -221,18 +221,22 @@ class HeapAll(gdb.Command):
         print('All chunks of memory on heap (both used and free)')
         print('-------------------------------------------------')
         ms = glibc_arenas.get_ms()
-        for i, chunk in enumerate(ms.iter_chunks()):
-            size = chunk.chunksize()
-            if chunk.is_inuse():
-                kind = ' inuse'
-            else:
-                kind = ' free'
+        try:
+            for i, chunk in enumerate(ms.iter_chunks()):
+                size = chunk.chunksize()
+                if chunk.is_inuse():
+                    kind = ' inuse'
+                else:
+                    kind = ' free'
 
-            print ('%i: %s -> %s %s: %i bytes (%s)'
-                   % (i,
-                      fmt_addr(chunk.as_address()),
-                      fmt_addr(chunk.as_address()+size-1),
-                      kind, size, chunk))
+                print ('%i: %s -> %s %s: %i bytes (%s)'
+                       % (i,
+                          fmt_addr(chunk.as_address()),
+                          fmt_addr(chunk.as_address()+size-1),
+                          kind, size, chunk))
+        except KeyboardInterrupt:
+            print("...Stopping")
+            return
         print()
 
 class HeapLog(gdb.Command):
@@ -405,7 +409,7 @@ class Objdump(gdb.Command):
         type_size_t_ptr = type_size_t.pointer()
 
         arg_list = gdb.string_to_argv(args)
-        parser = argparse.ArgumentParser(add_help=True, usage="objdump [-s SIZE] <ADDR>")
+        parser = argparse.ArgumentParser(add_help=True, usage="objdump  [-v][-s SIZE] <ADDR>")
         parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
         parser.add_argument('-s', dest='size', default=None, help='Total dump size')
         parser.add_argument('-v', dest='verbose', action="store_true", default=False, help='Verbose')
@@ -433,31 +437,34 @@ class Objdump(gdb.Command):
             print('Searching in the following object ranges')
             print('-------------------------------------------------')
         text = [] #list of pairs (start, end) of a code section
-        for i in gdb.inferiors():
-            for r in iter_code_sections(i.pid):
+        #XXX why pid would be 0?
+        for pid in [ o.pid for o in gdb.inferiors() if o.pid !=0 ]:
+            for r in iter_code_sections(pid):
                 if args_dict.verbose: print("%s - %s : %s" % (hex(r[0]), hex(r[1]), r[2]))
                 text.append((r[0], r[1], r[2]))
 
         print('\nDumping Object at address %s' % hex(addr))
         print('-------------------------------------------------')
         
-        for a in range(addr,addr+total_size, SIZE_SZ):
+        for a in range(addr, addr + (total_size * SIZE_SZ), SIZE_SZ):
             ptr = WrappedPointer(gdb.Value(a).cast(type_size_t_ptr))
             #dereference first, at the first access denied bail out, dont go further
             try:
                 val = ptr.dereference()
                 found = False
                 val_int = int(str(val.cast(type_size_t)))
+                pathname = ""
                 for t in text:
                     if val_int >= t[0] and val_int < t[1]:
                         found = True
+                        pathname = t[2]
                 
                 if found:
                     sym = lookup_symbol(val_int)
                     if sym:
-                        out_line = "%s => %s (%s in %s)" % (hex(ptr.as_address()), hex(val_int), sym, t[2] )
+                        out_line = "%s => %s (%s in %s)" % (hex(ptr.as_address()), hex(val_int), sym, pathname )
                     else:
-                        out_line = "%s => %s (%s)" % (hex(ptr.as_address()), hex(val_int), t[2] )
+                        out_line = "%s => %s (%s)" % (hex(ptr.as_address()), hex(val_int), pathname )
                 else:
                     out_line = "%s => %s" % (hex(ptr.as_address()), hex(val_int) )
                 print(out_line)

@@ -1,84 +1,20 @@
 gdb-heap
 ========
 
-Forked from https://fedorahosted.org/gdb-heap/
+Forked from https://fedorahosted.org/gdb-heap/ - https://github.com/rogerhu/gdb-heap 
 
-Installation instructions
--------------------------
-1. To get this module working with Ubuntu 12.04, make sure you have the following packages installed:
+A modified version of gdb-heap with some additional commands to understand heap allocations
 
-```
-sudo apt-get install libc6-dev libc6-dbg python-gi libglib2.0-dev python-ply
-```
-
-The original forked version assumes an "import gdb" module, which resides in
-"/usr/share/glib-2.0/gdb" as part of the libglib2.0-dev package.
-
-There is also a conflict with the python-gobject-2 library, which are deprecated
-Python bindings for the GObject library.  This package installs a glib/
-directory inside /usr/lib/python2.7/dist-packages/glib/option.py, which many
-Gtk-related modules depend.  You will therefore need to make sure the sys.path
-for /usr/share/glib-2.0/gdb is declared first for this reason (see code
-example).
-
-You'll also want to install python-dbg since the package comes with the
-debugging symbols for the stock Python 2.7, as well as a python-dbg binary
-compiled with the --with-pydebug option that will only work with C extensions
-modules compiled with the /usr/include/python2.7_d headers.
-
-NOTE: The Python binary that accompanies Ubuntu 12.04 uses link-time
-optimization compilation.  As a result, many of the Python data structures are
-optimized out and prevent gdb-heap from being able to properly categorize the
-various data structures.  To take advantage of this capability, you will need to
-download the Python source and recompile without using the -flto option in
-the CFLAGS/LDFLAGS configuration option.  Normally this capability is not used in
-standard configure so simply compiling it should do the trick.  (If you want
-to have SSL support in this binary, make sure to edit Modules/Setup.dist).
-
-The python-dbg binary is compiled with the Py_TRACE_REFS conditional via the
---pydebug which modifies the internal Python data structures and adds two
-pointers into every base PyObject, preventing previously compiled C extensions
-to be used.  Using your own compiled version of Python is therefore the way to
-go if you want to take advantage of the categorize features of gdb-heap and/or
-inspecting the internal memory structures of Python.
-
-2. Create a file that will help automate the loading of the gdbheap library:
-
-gdb-heap-commands:
-
-```
-python
-import sys
-sys.path.insert(0, "/usr/share/glib-2.0/gdb")
-sys.path.append("/usr/share/glib-2.0/gdb")
-sys.path.append("/home/rhu/projects/gdb-heap")
-import gdbheap
-end
-```
-
-To attach to an existing process, you can execute as follows:
-
-```bash
-sudo gdb -p 7458 -x ~/gdb-heap-commands
-```
-
-To take a core dump of a process, you can do the following:
-
-```
-1) sudo gdb -p <pid>
-2) Type "generate-core-file" at the GDB prompt.
-3) Wait awhile (and be careful not to hit enter again, since it will repeat the same command)
-4) Copy the core.<pid> file somewhere.
-```
-
-You can then use gdb to attach to this core file:
-
-```bash
-sudo gdb python <core file> -x ~/gdb-heap-commands
-```
+See README.old for the original README (do read it)
 
 
-Commands to run
+Load module in GDB
+------------------
+
+py import sys;sys.path.append("/path/gdb-heap");import gdbheap
+
+
+Commands available
 ---------------
 
 ```
@@ -91,9 +27,73 @@ heap log - print a log of recorded heap states
 heap label - record the current state of the heap for later comparison
 heap diff - compare two states of the heap
 heap select - query used heap chunks
-hexdump <addr> [-c] - print a hexdump, stating at the specific region of memory (expose hex characters with -c option)
+heap search - 
 heap arenas - print glibs arenas
 heap arena <arena> - select glibc arena number
+hexdump [-c] [-w] [-s SIZE] <ADDR> - print a hexdump, stating at the specific region of memory
+objdump [-v] [-s SIZE] <ADDR> - Consider ADDR as the start of an array of pointers and check if any resolves to a symbol
+```
+
+Examples:
+---------
+
+Cool things you can do now (on top of all the cool things you could already do with gdb-heap before)
+
+```
+#i know you wanted "!heap -x" from supercool windbg !heap plugin
+(gdb) heap search 0x008d721f
+search heap for address 0x8d721f
+-------------------------------------------------
+BLOCK:  0x008d6e00 -> 0x008d721f  inuse:
+        1056 bytes (<MChunkPtr chunk=0x8d6e00 mem=0x8d6e10 PREV_INUSE inuse chunksize=1056 memsize=1040>)
+
+
+# inspired by something similar in the also supercool Corelan's mona.py
+(gdb) objdump -s 30 0x0091eaf0
+
+Dumping Object at address 0x91eaf0
+-------------------------------------------------
+0x91eaf0 => 0x30
+0x91eaf8 => 0x191
+0x91eb00 => 0x180
+0x91eb08 => 0x909298
+0x91eb10 => 0x0
+0x91eb18 => 0x0
+0x91eb20 => 0x91ec98
+0x91eb28 => 0x0
+0x91eb30 => 0x610000 (/opt/SOMEBINARY)
+0x91eb38 => 0x91e4c8
+0x91eb40 => 0x0
+0x91eb48 => 0x0
+0x91eb50 => 0x8e0848
+0x91eb58 => 0x0
+0x91eb60 => 0x610000 (/opt/SOMEBINARY)
+0x91eb68 => 0x0
+0x91eb70 => 0x0
+0x91eb78 => 0x0
+0x91eb80 => 0x0
+0x91eb88 => 0x20000000000
+0x91eb90 => 0x4010600000088
+0x91eb98 => 0x3fffffff00000400
+0x91eba0 => 0x91ecf8
+0x91eba8 => 0x91ecf9
+0x91ebb0 => 0x7ffff6914760 (btreeInvokeBusyHandler.37095 in /opt/SOMELIBRARY.so.1.0.0)
+0x91ebb8 => 0x91e2a8
+0x91ebc0 => 0x7ffff6878b10 (pageReinit.36734 in /opt/SOMELIBRARY.so.1.0.0)
+0x91ebc8 => 0x922bb8
+0x91ebd0 => 0xffffffffffffffff
+0x91ebd8 => 0x91ebe8
+
+#this was already there, but a few things have changed
+(gdb) hexdump 0x8d6980
+0x008d6980 -> 0x008d698f 63 72 69 70 74 00 00 00 41 00 00 00 00 00 00 00 |cript...A.......|
+0x008d6990 -> 0x008d699f 1c 00 00 00 00 00 00 00 1c 00 00 00 00 00 00 00 |................|
+0x008d69a0 -> 0x008d69af 00 00 00 00 00 00 00 00 41 75 74 68 65 6e 74 69 |........Authenti|
+0x008d69b0 -> 0x008d69bf 63 61 74 69 6f 6e 20 46 61 69 6c 65 64 20 53 63 |cation Failed Sc|
+0x008d69c0 -> 0x008d69cf 72 69 70 74 00 00 00 00 31 00 00 00 00 00 00 00 |ript....1.......|
+0x008d69d0 -> 0x008d69df 09 00 00 00 00 00 00 00 09 00 00 00 00 00 00 00 |................|
+0x008d69e0 -> 0x008d69ef 00 00 00 00 00 00 00 00 50 61 73 73 77 6f 72 64 |........Password|
+
 ```
 
 Useful resources
