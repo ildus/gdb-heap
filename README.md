@@ -11,8 +11,9 @@ See README.old for the original README (do read it)
 Load module in GDB
 ------------------
 
+```
 py import sys;sys.path.append("/path/gdb-heap");import gdbheap
-
+```
 
 Commands available
 ---------------
@@ -27,7 +28,7 @@ heap log - print a log of recorded heap states
 heap label - record the current state of the heap for later comparison
 heap diff - compare two states of the heap
 heap select - query used heap chunks
-heap search - 
+heap search - Search for address in the heap
 heap arenas - print glibs arenas
 heap arena <arena> - select glibc arena number
 hexdump [-c] [-w] [-s SIZE] <ADDR> - print a hexdump, stating at the specific region of memory

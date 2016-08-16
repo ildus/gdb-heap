@@ -69,10 +69,15 @@ class MChunkPtr(WrappedPointer):
     def size(self):
         if not(hasattr(self, '_cached_size')):
             self._cached_size = int(self.field('size'))
+
         return self._cached_size
 
     def chunksize(self):
+        #try:
         return self.size() & ~(self.SIZE_BITS)
+        #XXX: not probably the best way, but we need to experiment a bit first
+        #except gdb.MemoryError:
+        #    return None
 
     def has_flag(self, flag):
         return self.size() & flag
@@ -87,6 +92,7 @@ class MChunkPtr(WrappedPointer):
         return self.has_flag(self.NON_MAIN_ARENA)
 
     def __str__(self):
+        corruptFlag = False
         result = ('<%s chunk=0x%x mem=0x%x'
                   % (self.__class__.__name__,
                      self.as_address(),
@@ -94,7 +100,11 @@ class MChunkPtr(WrappedPointer):
         if self.has_PREV_INUSE():
             result += ' PREV_INUSE'
         else:
-            result += ' prev_size=%i' % self.field('prev_size')
+            try:
+                result += ' prev_size=%i' % self.field('prev_size')
+            except gdb.MemoryError:
+                corruptFlag = True
+                result += ' prev_size=???'
         if self.has_NON_MAIN_ARENA():
             result += ' NON_MAIN_ARENA'
         if self.has_IS_MMAPPED():
@@ -105,8 +115,14 @@ class MChunkPtr(WrappedPointer):
             else:
                 result += ' free'
         SIZE_SZ = caching_lookup_type('size_t').sizeof
-        result += ' chunksize=%i memsize=%i>' % (self.chunksize(),
+        try:
+            result += ' chunksize=%i memsize=%i>' % (self.chunksize(),
                                                  self.chunksize() - (2 * SIZE_SZ))
+        except gdb.MemoryError:
+            result += ' chunksize=??? memsize=???>'
+            corruptFlag = True
+        if corruptFlag:
+            result += "<CORRUPT CHUNK>"
         return result
 
     def as_mem(self):

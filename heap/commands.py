@@ -318,7 +318,7 @@ class HeapSelect(gdb.Command):
             print(e)
 
 class HeapSearch(gdb.Command):
-    'Search for address in heap'
+    'Search for address in the heap'
     def __init__(self):
         gdb.Command.__init__ (self,
                               "heap search",
@@ -348,34 +348,56 @@ class HeapSearch(gdb.Command):
         else:
             addr = int(addr_arg)
         
-        print('search heap for address %s' % hex(addr))
-        print('-------------------------------------------------')
-        ms = glibc_arenas.get_ms()
-        output_str = ""
-        for i, chunk in enumerate(ms.iter_chunks()):
-            
-            size = chunk.chunksize()
-            if addr >= chunk.as_address() and addr < chunk.as_address() + size:
-                if chunk.is_inuse():
-                    kind = ' inuse'
-                else:
-                    kind = ' free'
-
-                output_str += 'BLOCK:\t%s -> %s %s: \n\t%i bytes (%s)\n' % (
-                          fmt_addr(chunk.as_address()),
-                          fmt_addr(chunk.as_address()+size-1),
-                          kind, size, chunk)
-                if args_dict.after:
-                    chunk_after = chunk.next_chunk()
+        try:
+            print('search heap for address %s' % fmt_addr(addr))
+            print('-------------------------------------------------')
+            ms = glibc_arenas.get_ms()
+            output_str = ""
+            corruptFlag = False
+            for i, chunk in enumerate(ms.iter_chunks()):
+                
+                try:
+                    size = chunk.chunksize()
+                except gdb.MemoryError:
+                    print("Corrupt chunk found at %s" % fmt_addr(chunk.as_address()))
+                    corruptFlag = True
+                    continue
+                if addr >= chunk.as_address() and addr < chunk.as_address() + size:
                     if chunk.is_inuse():
-                        kind = ' inuse'
+                        kind = 'inuse'
                     else:
-                        kind = ' free'
-                    output_str += 'NEXT:\t%s -> %s %s: \n\t%i bytes (%s)\n' % (
-                        fmt_addr(chunk_after.as_address()),
-                        fmt_addr(chunk_after.as_address()+size-1),
-                        kind, chunk_after.chunksize(), chunk_after)
-        print(output_str)
+                        kind = 'free'
+
+                    output_str += 'BLOCK:\t%s -> %s %s: \n\t%i bytes (%s)\n' % (
+                              fmt_addr(chunk.as_address()),
+                              fmt_addr(chunk.as_address()+size-1),
+                              kind, size, chunk)
+                    if args_dict.after:
+                        try:
+                            output_str += "NEXT:\t"
+                            chunk_after = chunk.next_chunk()
+                            start = chunk_after.as_address()
+                            output_str += fmt_addr(start)
+                            size = chunk_after.chunksize()
+                            output_str += " -> %s" % fmt_addr(start + size -1)
+
+                            if chunk_after.is_inuse():
+                                kind = 'inuse'
+                            else:
+                                kind = 'free'
+
+                            output_str += " %s:\n\t%i bytes" % (kind, size)
+                            output_str += " %s\n" % chunk_after
+                        except gdb.MemoryError:
+                            output_str += " <INVALID>\n"
+                            corruptFlag = True
+                            continue
+            if corruptFlag:
+                print("WARNING: Heap is corrupted")
+            print(output_str)
+        except KeyboardInterrupt:
+            print("Interrupt")
+            return
 
 class HeapChunk(gdb.Command):
     'Not implemented'
@@ -443,7 +465,7 @@ class Objdump(gdb.Command):
                 if args_dict.verbose: print("%s - %s : %s" % (hex(r[0]), hex(r[1]), r[2]))
                 text.append((r[0], r[1], r[2]))
 
-        print('\nDumping Object at address %s' % hex(addr))
+        print('\nDumping Object at address %s' % fmt_addr(addr))
         print('-------------------------------------------------')
         
         for a in range(addr, addr + (total_size * SIZE_SZ), SIZE_SZ):
@@ -462,14 +484,14 @@ class Objdump(gdb.Command):
                 if found:
                     sym = lookup_symbol(val_int)
                     if sym:
-                        out_line = "%s => %s (%s in %s)" % (hex(ptr.as_address()), hex(val_int), sym, pathname )
+                        out_line = "%s => %s (%s in %s)" % (fmt_addr(ptr.as_address()), fmt_addr(val_int), sym, pathname )
                     else:
-                        out_line = "%s => %s (%s)" % (hex(ptr.as_address()), hex(val_int), pathname )
+                        out_line = "%s => %s (%s)" % (fmt_addr(ptr.as_address()), fmt_addr(val_int), pathname )
                 else:
-                    out_line = "%s => %s" % (hex(ptr.as_address()), hex(val_int) )
+                    out_line = "%s => %s" % (fmt_addr(ptr.as_address()), fmt_addr(val_int) )
                 print(out_line)
             except gdb.MemoryError:
-                print("Error accessing memory at %s" % hex(ptr.as_address()))
+                print("Error accessing memory at %s" % fmt_addr(ptr.as_address()))
                 return
 
 
