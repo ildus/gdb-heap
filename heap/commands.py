@@ -400,7 +400,7 @@ class HeapSearch(gdb.Command):
             return
 
 class Objsearch(gdb.Command):
-    'search allocated chunks for possible object'
+    'search allocated chunks for possible objects (e.g. blocks containing pointers to mapped files)'
     def __init__(self):
         gdb.Command.__init__ (self,
                               "objsearch",
@@ -417,9 +417,9 @@ class Objsearch(gdb.Command):
 
         #XXX what about multiple heaps/arenas?
         arg_list = gdb.string_to_argv(args)
-        parser = argparse.ArgumentParser(add_help=True, usage="objsearch")
+        parser = argparse.ArgumentParser(add_help=True, usage="objsearch [-v] [-s SIZE]")
         parser.add_argument('-v', dest='verbose', action="store_true", default=False, help='Verbose')
-        parser.add_argument('-s', dest='size', type=int, default=10, help='Total dump size')
+        parser.add_argument('-s', dest='size', type=int, default=10, help='From the start of the block, how many possible pointers we check, default 16')
 
         try:
             args_dict = parser.parse_args(args=arg_list)
@@ -437,7 +437,6 @@ class Objsearch(gdb.Command):
                 if args_dict.verbose: print("%s - %s : %s" % (hex(r[0]), hex(r[1]), r[2]))
                 text.append((r[0], r[1], r[2]))
 
-        #how many pointers should we check?
         size = args_dict.size * SIZE_SZ
         try:
             print('searching heap for potential objects')
@@ -456,20 +455,17 @@ class Objsearch(gdb.Command):
                 block_is_object = False
                 for addr in range(block, block + block_search_size, SIZE_SZ):
                     ptr = WrappedPointer(gdb.Value(addr).cast(type_size_t_ptr))
-                    #try:
+
                     val = ptr.dereference()
                     found = False
                     val_int = int(str(val.cast(type_size_t)))
                     for t in text:
                         if val_int >= t[0] and val_int < t[1]:
                             found = True
-                            #pathname = t[2]
 
                     sym = lookup_symbol(val_int)
-                    #print("test %s" % fmt_addr(block))
                     if found and sym != None:
                         block_is_object = True
-                        print("found")
 
                 if block_is_object:
                     print("Interesting block found at %s" % fmt_addr(block))
