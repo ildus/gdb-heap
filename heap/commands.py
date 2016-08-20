@@ -354,7 +354,7 @@ class HeapSearch(gdb.Command):
             ms = glibc_arenas.get_ms()
             output_str = ""
             corruptFlag = False
-            for i, chunk in enumerate(ms.iter_chunks()):
+            for chunk in ms.iter_chunks():
                 
                 try:
                     size = chunk.chunksize()
@@ -399,20 +399,6 @@ class HeapSearch(gdb.Command):
             print("Interrupt")
             return
 
-class HeapChunk(gdb.Command):
-    'Not implemented'
-    def __init__(self):
-        gdb.Command.__init__ (self,
-                              "heap chunk",
-                              gdb.COMMAND_DATA)
-
-    @need_debuginfo
-    @target_running
-    def invoke(self, args, from_tty):
-        print(args)
-        arg_list = gdb.string_to_argv(args)
-        print(arg_list)
-
 class Objsearch(gdb.Command):
     'search allocated chunks for possible object'
     def __init__(self):
@@ -452,7 +438,7 @@ class Objsearch(gdb.Command):
                 text.append((r[0], r[1], r[2]))
 
         #how many pointers should we check?
-        size = args_dict.size
+        size = args_dict.size * SIZE_SZ
         try:
             print('searching heap for potential objects')
             print('-------------------------------------------------')
@@ -468,7 +454,7 @@ class Objsearch(gdb.Command):
                     corruptFlag = True
                     continue
                 block_is_object = False
-                for addr in range(block, block_search_size, SIZE_SZ):
+                for addr in range(block, block + block_search_size, SIZE_SZ):
                     ptr = WrappedPointer(gdb.Value(addr).cast(type_size_t_ptr))
                     #try:
                     val = ptr.dereference()
@@ -480,6 +466,7 @@ class Objsearch(gdb.Command):
                             #pathname = t[2]
 
                     sym = lookup_symbol(val_int)
+                    #print("test %s" % fmt_addr(block))
                     if found and sym != None:
                         block_is_object = True
                         print("found")
@@ -688,7 +675,6 @@ def register_commands():
     HeapArenas()
     HeapArenaSelect()
     HeapSearch()
-    HeapChunk()
     Hexdump()
     Objdump()
     Objsearch()

@@ -73,15 +73,16 @@ class MChunkPtr(WrappedPointer):
         return self._cached_size
 
     def chunksize(self):
+        '''Returns actual Chunk size. Throws gdb.MemoryError if chunk is corrupted'''
         #try:
         return self.size() & ~(self.SIZE_BITS)
-        #XXX: not probably the best way, but we need to experiment a bit first
         #except gdb.MemoryError:
         #    return None
 
     def memsize(self):
+        '''Returns size of the allocated block'''
         SIZE_SZ = caching_lookup_type('size_t').sizeof
-        return self.size() - (2 * SIZE_SZ)
+        return self.chunksize() - (2 * SIZE_SZ)
 
     def has_flag(self, flag):
         return self.size() & flag
