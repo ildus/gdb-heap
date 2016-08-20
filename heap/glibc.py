@@ -79,6 +79,10 @@ class MChunkPtr(WrappedPointer):
         #except gdb.MemoryError:
         #    return None
 
+    def memsize(self):
+        SIZE_SZ = caching_lookup_type('size_t').sizeof
+        return self.size() - (2 * SIZE_SZ)
+
     def has_flag(self, flag):
         return self.size() & flag
 
@@ -116,8 +120,7 @@ class MChunkPtr(WrappedPointer):
                 result += ' free'
         SIZE_SZ = caching_lookup_type('size_t').sizeof
         try:
-            result += ' chunksize=%i memsize=%i>' % (self.chunksize(),
-                                                 self.chunksize() - (2 * SIZE_SZ))
+            result += ' chunksize=%i memsize=%i>' % (self.chunksize(), self.memsize())
         except gdb.MemoryError:
             result += ' chunksize=??? memsize=???>'
             corruptFlag = True
@@ -417,7 +420,7 @@ def iter_mappings(pid):
             start, end, perms, offset, dev, inode, pathname = m.groups()
             # PROT_READ, PROT_WRITE, MAP_PRIVATE:
             start, end = [int(m.group(i), 16) for i in (1, 2)]
-            yield (start, end, perms, offset, dev, inode, pathname)
+            yield (start, end, pathname, perms, offset, dev, inode)
         else:
             print('unmatched :', line)
 
@@ -427,7 +430,7 @@ def iter_mmap_heap_chunks(pid):
 
     Yield a sequence of (start, end) pairs'''
     
-    for start, end, perms, offset, dev, inode, pathname in iter_mappings(pid):
+    for start, end, pathname, perms, offset, dev, inode in iter_mappings(pid):
         if perms == 'rw-p':
             if offset == '00000000': # FIXME bits?
                 if dev == '00:00': # FIXME
@@ -439,7 +442,7 @@ def iter_mmap_heap_chunks(pid):
 
 #returns (start, end, pathname) of object if executable or writable (dynamic sections)
 def iter_code_sections(pid):
-    for start, end, perms, offset, dev, inode, pathname in iter_mappings(pid):
+    for start, end, pathname, perms, offset, dev, inode in iter_mappings(pid):
         #print( "-".join([str(i) for i in [start, end, perms, offset, dev, inode, pathname] ]))
         if re.fullmatch("..x.", perms) or re.fullmatch(".w..", perms):
             if dev != '00:00': # FIXME
