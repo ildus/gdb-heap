@@ -399,85 +399,6 @@ class HeapSearch(gdb.Command):
             print("Interrupt")
             return
 
-class Objsearch(gdb.Command):
-    'search allocated chunks for possible objects (e.g. blocks containing pointers to mapped files)'
-    def __init__(self):
-        gdb.Command.__init__ (self,
-                              "objsearch",
-                              gdb.COMMAND_DATA)
-
-    @need_debuginfo
-    @target_running
-    def invoke(self, args, from_tty):
-        from heap.glibc import iter_mappings,lookup_symbol,glibc_arenas
-        from heap import WrappedPointer,caching_lookup_type
-        SIZE_SZ = caching_lookup_type('size_t').sizeof
-        type_size_t = gdb.lookup_type('size_t')
-        type_size_t_ptr = type_size_t.pointer()
-
-        #XXX what about multiple heaps/arenas?
-        arg_list = gdb.string_to_argv(args)
-        parser = argparse.ArgumentParser(add_help=True, usage="objsearch [-v] [-s SIZE]")
-        parser.add_argument('-v', dest='verbose', action="store_true", default=False, help='Verbose')
-        parser.add_argument('-s', dest='size', type=int, default=10, help='From the start of the block, how many possible pointers we check, default 16')
-
-        try:
-            args_dict = parser.parse_args(args=arg_list)
-        except:
-            return
-
-        dump_size_limit = 0x40 #XXX this could be a user option
-        if args_dict.verbose:
-            print('Searching in the following object ranges')
-            print('-------------------------------------------------')
-        text = [] #list of tuples (start, end, pathname, ..) of a valid memory map
-        #XXX why pid would be 0?
-        for pid in [ o.pid for o in gdb.inferiors() if o.pid !=0 ]:
-            for r in iter_mappings(pid):
-                if args_dict.verbose: print("%s - %s : %s" % (hex(r[0]), hex(r[1]), r[2]))
-                text.append((r[0], r[1], r[2]))
-
-        size = args_dict.size * SIZE_SZ
-        try:
-            print('searching heap for potential objects')
-            print('-------------------------------------------------')
-            ms = glibc_arenas.get_ms()
-            output_str = ""
-            corruptFlag = False
-            for chunk in ms.iter_chunks():
-                block = chunk.as_mem()
-                try:
-                    block_search_size = chunk.memsize() if chunk.memsize() > size else size
-                except gdb.MemoryError:
-                    print("Corrupt chunk found pointing at %s" % fmt_addr(chunk.as_address()))
-                    corruptFlag = True
-                    continue
-                block_is_object = False
-                for addr in range(block, block + block_search_size, SIZE_SZ):
-                    ptr = WrappedPointer(gdb.Value(addr).cast(type_size_t_ptr))
-
-                    val = ptr.dereference()
-                    found = False
-                    val_int = int(str(val.cast(type_size_t)))
-                    for t in text:
-                        if val_int >= t[0] and val_int < t[1]:
-                            found = True
-
-                    sym = lookup_symbol(val_int)
-                    if found and sym != None:
-                        block_is_object = True
-
-                if block_is_object:
-                    print("Interesting block found at %s" % fmt_addr(block))
-                    dump_size = chunk.memsize() if chunk.memsize() < dump_size_limit else dump_size_limit
-                    gdb.execute("objdump -s %d %s" % ( dump_size, fmt_addr(block) ))
-            if corruptFlag:
-                print("WARNING: Heap is corrupted")
-        except KeyboardInterrupt:
-            print("Interrupt")
-            return
-
-
 class Objdump(gdb.Command):
     'Try to detect if ADDR is an object and dump it'
     def __init__(self):
@@ -673,7 +594,6 @@ def register_commands():
     HeapSearch()
     Hexdump()
     Objdump()
-    Objsearch()
 
     from heap.cpython import register_commands as register_cpython_commands
     register_cpython_commands()
