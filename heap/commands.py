@@ -363,10 +363,14 @@ class HeapSearch(gdb.Command):
                     corruptFlag = True
                     continue
                 if addr >= chunk.as_address() and addr < chunk.as_address() + size:
-                    if chunk.is_inuse():
-                        kind = 'inuse'
-                    else:
-                        kind = 'free'
+                    try:
+                        if chunk.is_inuse():
+                            kind = 'inuse'
+                        else:
+                            kind = 'free'
+                    except gdb.MemoryError:
+                        corruptFlag = True
+                        kind = "CORRUPT"
 
                     output_str += 'BLOCK:\t%s -> %s %s: \n\t%i bytes (%s)\n' % (
                               fmt_addr(chunk.as_address()),
@@ -420,6 +424,7 @@ class Objsearch(gdb.Command):
         parser = argparse.ArgumentParser(add_help=True, usage="objsearch [-v] [-s SIZE]")
         parser.add_argument('-v', dest='verbose', action="store_true", default=False, help='Verbose')
         parser.add_argument('-s', dest='size', type=int, default=10, help='From the start of the block, how many possible pointers we check, default 16')
+        #XXX add inuse only option
 
         try:
             args_dict = parser.parse_args(args=arg_list)
@@ -454,18 +459,24 @@ class Objsearch(gdb.Command):
                     continue
                 block_is_object = False
                 for addr in range(block, block + block_search_size, SIZE_SZ):
-                    ptr = WrappedPointer(gdb.Value(addr).cast(type_size_t_ptr))
+                    try:
+                        ptr = WrappedPointer(gdb.Value(addr).cast(type_size_t_ptr))
 
-                    val = ptr.dereference()
-                    found = False
-                    val_int = int(str(val.cast(type_size_t)))
-                    for t in text:
-                        if val_int >= t[0] and val_int < t[1]:
-                            found = True
+                        val = ptr.dereference()
+                        found = False
+                        val_int = int(str(val.cast(type_size_t)))
+                        #exclude pointers to heap space, glibc, ld.so
+                        for t in text:
+                            if val_int >= t[0] and val_int < t[1] and t[2] != "[heap]":
+                                found = True
 
-                    sym = lookup_symbol(val_int)
-                    if found and sym != None:
-                        block_is_object = True
+                        sym = lookup_symbol(val_int)
+                        if found and sym != None:
+                            block_is_object = True
+                    except gdb.MemoryError:
+                        #access denied at this point are odd, ignore and move on
+                        block_is_object = False
+                        continue
 
                 if block_is_object:
                     print("Interesting block found at %s" % fmt_addr(block))
@@ -497,7 +508,7 @@ class Objdump(gdb.Command):
         arg_list = gdb.string_to_argv(args)
         parser = argparse.ArgumentParser(add_help=True, usage="objdump  [-v][-s SIZE] <ADDR>")
         parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
-        parser.add_argument('-s', dest='size', default=None, help='Total dump size')
+        parser.add_argument('-s', dest='size', default="0x10", help='Total dump size, defalt:16(*sizeof(size_t))')
         parser.add_argument('-v', dest='verbose', action="store_true", default=False, help='Verbose')
         
         try:
@@ -511,14 +522,11 @@ class Objdump(gdb.Command):
         else:
             addr = int(addr_arg)
 
-        if args_dict.size:
-            if args_dict.size.startswith('0x'):
-                total_size = int(args_dict.size, 16)
-            else:
-                total_size = int(args_dict.size)
+        if args_dict.size.startswith('0x'):
+            total_size = int(args_dict.size, 16)
         else:
-            total_size = 10 * SIZE_SZ
-
+            total_size = int(args_dict.size)
+        
         if args_dict.verbose:
             print('Searching in the following object ranges')
             print('-------------------------------------------------')
