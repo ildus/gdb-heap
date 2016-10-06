@@ -485,68 +485,6 @@ class Objdump(gdb.Command):
                 return
 
 
-class Hexdump(gdb.Command):
-    'Print a hexdump, starting at the specific region of memory'
-    def __init__(self):
-        gdb.Command.__init__ (self,
-                              "hexdump",
-                              gdb.COMMAND_DATA)
-
-    def invoke(self, args, from_tty):
-        
-        arg_list = gdb.string_to_argv(args)
-        parser = argparse.ArgumentParser(add_help=True, usage="hexdump [-c] [-w] [-s SIZE] <ADDR>")
-        parser.add_argument('addr', metavar='ADDR', type=str, nargs=1, help="Target address")
-        parser.add_argument('-c', dest='chars', action="store_true", default=False, help="Show chars only")
-        parser.add_argument('-s', dest='size', default=None, help='Total Dump size')
-        parser.add_argument('-w', dest='wide', action="store_true", default=False, 
-            help='wide: 32 bytes per line instead of 16')
-
-        try:
-            args_dict = parser.parse_args(args=arg_list)
-        except:
-            return
-
-        addr_arg = args_dict.addr[0]
-        if args_dict.size:
-            if args_dict.size.startswith('0x'):
-                total_size = int(args_dict.size, 16)
-            else:
-                total_size = int(args_dict.size)
-        else:
-            total_size = 0x100
-
-        if args_dict.wide:
-            size = 32
-        else:
-            size = 16
-
-        chars_only = args_dict.chars
-
-
-        if addr_arg.startswith('0x'):
-            start = int(addr_arg, 16)
-        else:
-            start = int(addr_arg)
-
-        addr = start
-        end = addr + total_size
-        try:
-            while addr + size <= end:
-                hd = hexdump_as_bytes(addr, size, chars_only=chars_only)
-                print ('%s -> %s %s' % (fmt_addr(addr), fmt_addr(addr + size -1), hd))
-                addr += size
-            
-            r = (end-start) % size
-            if r > 0 :
-                hd = hexdump_as_bytes(addr, r, chars_only=chars_only)
-                print ('%s -> %s %s' % (fmt_addr(addr), fmt_addr(addr + r -1), hd))
-        except KeyboardInterrupt:
-            print("Interrupt")
-            return
-        except gdb.MemoryError:
-            print("Error accessing memory")
-
 class HeapArenas(gdb.Command):
     'Display heap arenas available'
     def __init__(self):
@@ -592,7 +530,6 @@ def register_commands():
     HeapArenas()
     HeapArenaSelect()
     HeapSearch()
-    Hexdump()
     Objdump()
 
     from heap.cpython import register_commands as register_cpython_commands
