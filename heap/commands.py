@@ -459,7 +459,7 @@ class Objdump(gdb.Command):
             try:
                 val = ptr.dereference()
                 found = False
-                val_int = int(str(val.cast(type_size_t)))
+                val_int = int(str(val.cast(type_size_t))) #XXX Error occurred in Python command: invalid literal for int() with base 10: '0x418'
                 pathname = ""
                 for t in text:
                     if val_int >= t[0] and val_int < t[1]:
