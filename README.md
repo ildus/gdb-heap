@@ -31,7 +31,6 @@ heap select - query used heap chunks
 heap search - Search for address in the heap
 heap arenas - print glibs arenas
 heap arena <arena> - select glibc arena number
-hexdump [-c] [-w] [-s SIZE] <ADDR> - print a hexdump, stating at the specific region of memory
 objdump [-v] [-s SIZE] <ADDR> - Consider ADDR as the start of an array of pointers and check if any resolves to a symbol
 ```
 
