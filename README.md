@@ -84,16 +84,6 @@ Dumping Object at address 0x91eaf0
 0x91ebd0 => 0xffffffffffffffff
 0x91ebd8 => 0x91ebe8
 
-#this was already there, but a few things have changed
-(gdb) hexdump 0x8d6980
-0x008d6980 -> 0x008d698f 63 72 69 70 74 00 00 00 41 00 00 00 00 00 00 00 |cript...A.......|
-0x008d6990 -> 0x008d699f 1c 00 00 00 00 00 00 00 1c 00 00 00 00 00 00 00 |................|
-0x008d69a0 -> 0x008d69af 00 00 00 00 00 00 00 00 41 75 74 68 65 6e 74 69 |........Authenti|
-0x008d69b0 -> 0x008d69bf 63 61 74 69 6f 6e 20 46 61 69 6c 65 64 20 53 63 |cation Failed Sc|
-0x008d69c0 -> 0x008d69cf 72 69 70 74 00 00 00 00 31 00 00 00 00 00 00 00 |ript....1.......|
-0x008d69d0 -> 0x008d69df 09 00 00 00 00 00 00 00 09 00 00 00 00 00 00 00 |................|
-0x008d69e0 -> 0x008d69ef 00 00 00 00 00 00 00 00 50 61 73 73 77 6f 72 64 |........Password|
-
 ```
 
 Useful resources
